@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>아진T와 함께 찾아보는 우리말-영어 사전</title>
+    <link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Gowun+Dodum&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #fff9db;
+            --point-color: #ffec99;
+            --text-color: #5c940d;
+            --accent-color: #fab005;
+        }
+        body {
+            background-color: var(--bg-color);
+            font-family: 'Gowun Dodum', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            color: #444;
+        }
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 30px;
+            box-shadow: 0 10px 25px rgba(250, 176, 5, 0.15);
+            width: 90%;
+            max-width: 500px;
+            text-align: center;
+            border: 4px solid var(--point-color);
+        }
+        h1 { font-family: 'Gaegu', cursive; color: var(--accent-color); font-size: 2.2rem; margin-bottom: 10px; }
+        .welcome-msg {
+            background-color: #fffde7;
+            padding: 15px;
+            border-radius: 20px;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            color: #666;
+            border: 1px dashed var(--accent-color);
+        }
+        .search-box { display: flex; gap: 10px; margin-bottom: 20px; }
+        input {
+            flex: 1;
+            padding: 12px 20px;
+            border: 2px solid var(--point-color);
+            border-radius: 50px;
+            outline: none;
+            font-size: 1rem;
+        }
+        button {
+            background-color: var(--point-color);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            font-family: 'Gaegu', cursive;
+            font-size: 1.2rem;
+        }
+        button:hover { background-color: var(--accent-color); }
+        #result { margin-top: 20px; text-align: left; }
+        .word-card { padding: 15px; border-radius: 15px; background: #fffcf0; border: 1px solid var(--point-color); }
+        .eng-word { font-size: 1.8rem; font-weight: bold; color: var(--accent-color); }
+        .tts-btn { font-size: 1.5rem; cursor: pointer; background: none; border: none; }
+        .mean-item { margin-top: 10px; padding-left: 10px; border-left: 3px solid var(--point-color); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📚 아진T의 한영 사전</h1>
+    <div class="welcome-msg">
+        안녕👋 남양이들! 오늘도 힘차게 영어 공부를 시작해보자! <br>
+        선생님은 언제나 여기에 있으니 언제든 도움을 요청해 😉
+    </div>
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="한국어 단어를 입력하세요">
+        <button onclick="searchWord()">찾기!</button>
+    </div>
+    <div id="result"></div>
+</div>
+
+<script>
+    async function searchWord() {
+        const query = document.getElementById('searchInput').value.trim();
+        const resultDiv = document.getElementById('result');
+        if (!query) return;
+
+        resultDiv.innerHTML = '<p style="text-align:center;">열심히 찾는 중... 🔍</p>';
+
+        try {
+            // 1. 구글 번역 API (무료 스크립트 경로)를 활용해 한국어 -> 영어 변환
+            const translateUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=ko&tl=en&dt=t&q=${encodeURIComponent(query)}`;
+            const transRes = await fetch(translateUrl);
+            const transData = await transRes.json();
+            const translatedWord = transData[0][0][0].toLowerCase().trim();
+
+            // 2. Dictionary API로 상세 정보 검색
+            const dictRes = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${translatedWord}`);
+            
+            if (!dictRes.ok) {
+                // 사전 데이터가 없을 경우 검색된 단어라도 보여줌
+                showSimpleResult(translatedWord);
+                return;
+            }
+
+            const dictData = await dictRes.json();
+            showFullResult(dictData[0]);
+
+        } catch (error) {
+            resultDiv.innerHTML = '<p>단어를 찾는 데 실패했어요. 다시 시도해봐요!</p>';
+        }
+    }
+
+    function showSimpleResult(word) {
+        const resultDiv = document.getElementById('result');
+        resultDiv.innerHTML = `
+            <div class="word-card">
+                <div style="display:flex; justify-content:space-between;">
+                    <span class="eng-word">${word}</span>
+                    <button class="tts-btn" onclick="speak('${word}')">🔊</button>
+                </div>
+                <p>상세 사전 정의는 없지만, 번역 결과는 이 단어예요!</p>
+            </div>`;
+    }
+
+    function showFullResult(data) {
+        const resultDiv = document.getElementById('result');
+        const meanings = data.meanings.slice(0, 2).map(m => `
+            <div class="mean-item">
+                <strong>[${m.partOfSpeech}]</strong><br>
+                ${m.definitions[0].definition}
+            </div>
+        `).join('');
+
+        resultDiv.innerHTML = `
+            <div class="word-card">
+                <div style="display:flex; justify-content:space-between;">
+                    <span class="eng-word">${data.word}</span>
+                    <button class="tts-btn" onclick="speak('${data.word}')">🔊</button>
+                </div>
+                ${meanings}
+            </div>`;
+    }
+
+    function speak(text) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'en-US';
+        window.speechSynthesis.speak(utterance);
+    }
+</script>
+</body>
+</html>
